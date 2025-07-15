@@ -1,54 +1,80 @@
 "use client";
 import axios from "axios";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import io from "socket.io-client";
+const socket = io.connect("http://localhost:8000");
 
 export default function Home() {
-  const [username, setUsername] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
+  // const [latitude, setLatitude] = useState("");
+  // const [longitude, setLongitude] = useState("");
+  const [receivedMessage, setReceivedMessage] = useState("");
+  const [room, setRoom] = useState("");
+  const [message, setMessage] = useState("");
 
   async function onEnter() {
-    navigator.geolocation.getCurrentPosition(
-      (data) => {
-        setLatitude(data.coords.latitude);
-        setLongitude(data.coords.longitude);
-        console.log(data.coords.latitude, data.coords.longitude);
-      },
-      (error) => {
-        console.error(error);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 5000,
-      }
-    );
-    if (username && longitude && latitude) {
-      const response = await axios.post(`http://localhost:8004/add`, {
-        username,
-        latitude,
-        longitude,
-      });
-      console.log(response.data);
-    }
+    // navigator.geolocation.getCurrentPosition(
+    //   (data) => {
+    //     setLatitude(data.coords.latitude);
+    //     setLongitude(data.coords.longitude);
+    //     console.log(data.coords.latitude, data.coords.longitude);
+    //   },
+    //   (error) => {
+    //     console.error(error);
+    //   },
+    //   {
+    //     enableHighAccuracy: true,
+    //     timeout: 5000,
+    //   }
+    // );
+    socket.emit("send_message", {
+      message,
+      room,
+    });
   }
 
+  async function onJoin() {
+    if (!room) {
+      return;
+    }
+    socket.emit("join_room", room);
+  }
+
+  useEffect(() => {
+    socket.on("receive_message", (data) => {
+      console.log(data.message);
+      setReceivedMessage(data.message);
+    });
+  }, [socket]);
+
   return (
-    <div className="h-screen w-full flex justify-center items-center">
-      <div className="flex flex-col gap-4 items-center justify-center bg-neutral-900 w-lg p-4 rounded-lg">
+    <div className="h-screen w-full flex flex-col gap-6 justify-center items-center">
+      <div className="flex flex-col gap-4 items-center justify-center bg-neutral-900 w-md p-4 rounded-lg">
         <input
+          className="bg-neutral-800 w-full h-14 px-4 rounded-md focus:outline-none border border-neutral-600 font-mono"
           onChange={(e) => {
-            setUsername(e.target.value);
+            setRoom(e.target.value);
           }}
-          className="w-full h-14 px-4 bg-black rounded-md text-xl focus:outline-none"
-          placeholder="enter your username"
+        />
+        <button
+          onClick={onJoin}
+          className="w-full h-14 bg-neutral-200 text-center text-xl rounded-md text-black"
+        >
+          join
+        </button>
+        <input
+          className="bg-neutral-800 w-full h-14 px-4 rounded-md focus:outline-none border border-neutral-600 font-mono"
+          onChange={(e) => {
+            setMessage(e.target.value);
+          }}
         />
         <button
           onClick={onEnter}
           className="w-full h-14 bg-neutral-200 text-center text-xl rounded-md text-black"
         >
-          enter
+          send
         </button>
       </div>
+      <div className="text-xl font-bold">Received msg: {receivedMessage}</div>
     </div>
   );
 }

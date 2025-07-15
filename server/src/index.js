@@ -1,33 +1,34 @@
+const { createServer } = require("http");
 const express = require("express");
-const { v4: uuidv4 } = require("uuid");
+const { Server } = require("socket.io");
 const cors = require("cors");
+const { v4: uuidv4 } = require("uuid");
+
 const app = express();
 app.use(cors());
-app.use(express.json());
-const port = 8004;
+const port = 8000;
 
-app.get("/", (req, res) => {
-  res.status(200).json({ message: "chat" });
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*",
+  },
 });
 
-let allUsers = [];
+io.on("connection", (socket) => {
+  console.log(`user connected: `, socket.id);
 
-// add users in the room
-app.post("/add", (req, res) => {
-  console.log(req.body);
-  const { username, latitude, longitude } = req.body;
-  const userData = {
-    id: uuidv4(),
-    username: username,
-    latitude: latitude,
-    longitude: longitude,
-  };
-  console.log(`adding user: ${JSON.stringify(userData)}`);
-  allUsers.push(userData);
+  socket.on("join_room", (data) => {
+    console.log("joined room:", data);
+    socket.join(data);
+  });
 
-  res.status(200).json({ message: "user added successfully" });
+  socket.on("send_message", (data) => {
+    console.log(data);
+    socket.to(data.room).emit("receive_message", data);
+  });
 });
 
-app.listen(port, () => {
+httpServer.listen(port, () => {
   console.log(`http://localhost:${port}`);
 });
