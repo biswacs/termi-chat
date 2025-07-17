@@ -8,7 +8,9 @@ export default function Home() {
   // const [latitude, setLatitude] = useState("");
   // const [longitude, setLongitude] = useState("");
   const [receivedMessage, setReceivedMessage] = useState("");
+  const [receivedPvtMessage, setReceivedPvtMessage] = useState("");
   const [room, setRoom] = useState("");
+  const [receiversId, setReceiversId] = useState("");
   const [message, setMessage] = useState("");
 
   async function onEnter() {
@@ -39,10 +41,21 @@ export default function Home() {
     socket.emit("join_room", room);
   }
 
+  const sendPrivateMsg = async () => {
+    socket.emit("private", receiversId, message);
+  };
+
   useEffect(() => {
     socket.on("receive_message", (data) => {
       console.log(data.message);
       setReceivedMessage(data.message);
+    });
+  }, [socket]);
+
+  useEffect(() => {
+    socket.on("receive_private", (data) => {
+      console.log(data);
+      setReceivedPvtMessage(data);
     });
   }, [socket]);
 
@@ -75,6 +88,33 @@ export default function Home() {
         </button>
       </div>
       <div className="text-xl font-bold">Received msg: {receivedMessage}</div>
+
+      <div className="bg-neutral-900 p-4 flex flex-col gap-4 w-md">
+        <p>test private messagess</p>
+        <input
+          className="bg-neutral-800 w-full h-14 px-4 rounded-md focus:outline-none border border-neutral-600 font-mono"
+          placeholder="enter your mesage"
+          onChange={(e) => {
+            setMessage(e.target.value);
+          }}
+        />{" "}
+        <input
+          className="bg-neutral-800 w-full h-14 px-4 rounded-md focus:outline-none border border-neutral-600 font-mono"
+          placeholder="enter receivers Id"
+          onChange={(e) => {
+            setReceiversId(e.target.value);
+          }}
+        />
+        <button
+          onClick={sendPrivateMsg}
+          className="w-full h-14 bg-neutral-200 text-center text-xl rounded-md text-black"
+        >
+          send
+        </button>
+        <div className="text-xl font-bold">
+          Received msg: {receivedPvtMessage}
+        </div>
+      </div>
     </div>
   );
 }

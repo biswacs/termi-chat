@@ -22,17 +22,24 @@ io.on("connection", (socket) => {
   users.push(socket.id);
 
   socket.on("join_room", (data) => {
-    console.log("joined room:", data);
-    console.log("user: ", socket.id);
+    console.log("userId for joining room: ", socket.id, " roomNo:", data);
     socket.join(data);
   });
 
+  socket.on("private", (userId, data) => {
+    console.log("Receivers userId: ", userId, " data: ", data);
+    socket.to(userId).emit("receive_private", data);
+  });
+
   socket.on("send_message", (data) => {
-    console.log("user for msg: ", socket.id);
-    console.log(data);
-    console.log(users);
+    console.log("Senders userId: ", socket.id, " data: ", data);
+    console.log("All userIds stored in local memory: ", users);
     socket.to(data.room).emit("receive_message", data);
   });
+
+  socket.on("disconnect",(reason)=>{
+    console.log(`SocketId disconnected with id ${socket.id} for reason: ${reason}`)
+  })
 });
 
 httpServer.listen(port, () => {
