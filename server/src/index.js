@@ -73,8 +73,27 @@ io.on("connection", (socket) => {
     );
     for (client_id in clients) {
       if (clients[client_id].socket_id === socket.id) {
+        console.log("deleting client:", clients[client_id]);
         delete clients[client_id];
         break;
+      }
+    }
+
+    for (room_id in rooms) {
+      let receiver_socket_id;
+      if (rooms[room_id].client_1.socket_id === socket.id) {
+        receiver_socket_id = rooms[room_id].client_2.socket_id;
+        delete rooms[room_id];
+      } else if (rooms[room_id].client_2.socket_id === socket.id) {
+        receiver_socket_id = rooms[room_id].client_1.socket_id;
+        delete rooms[room_id];
+      }
+      if (receiver_socket_id) {
+        console.log(
+          "notifying other user about disconnection: ",
+          receiver_socket_id
+        );
+        io.to(receiver_socket_id).emit("disconnected");
       }
     }
   });
