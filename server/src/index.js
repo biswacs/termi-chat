@@ -1,45 +1,83 @@
 const { createServer } = require("http");
-const express = require("express");
 const { Server } = require("socket.io");
-const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
-
-const app = express();
-app.use(cors());
 const port = 8000;
 
-const httpServer = createServer(app);
+const httpServer = createServer();
 const io = new Server(httpServer, {
   cors: {
     origin: "*",
   },
 });
 
-let users = [];
+let clients = {};
+let rooms = {};
+
+const match_clients = (clients) => {
+  const keys = Object.keys(clients);
+  let clients_count = Object.keys(clients).length;
+  if (clients_count >= 2) {
+    const client_1_id = clients[keys[0]];
+    const client_2_id = clients[keys[keys.length - 1]];
+    const room_id = uuidv4();
+    rooms[room_id] = {
+      client_1: client_1_id,
+      client_2: client_2_id,
+    };
+    delete clients[keys[0]];
+    delete clients[keys[keys.length - 1]];
+    console.log("deleted client_1 from pool: ", client_1_id);
+    console.log("deleted client_2 from pool: ", client_2_id);
+    return rooms[room_id];
+  }
+};
 
 io.on("connection", (socket) => {
-  console.log(`user connected: `, socket.id);
-  users.push(socket.id);
-
-  socket.on("join_room", (data) => {
-    console.log("userId for joining room: ", socket.id, " roomNo:", data);
-    socket.join(data);
+  // console.log(`user connected: `, socket.id);
+  socket.on("register_client", (data) => {
+    clients[data.client_id] = {
+      socket_id: socket.id,
+      // latitude: data.latitude,
+      // longitude: data.longitude,
+    };
+    console.log(clients);
+    const room = match_clients(clients);
+    if (!room) {
+      return null;
+    }
+    console.log("created room: ", room);
+    io.to(room.client_1.socket_id).emit("registration_complete", room);
+    io.to(room.client_2.socket_id).emit("registration_complete", room);
   });
 
-  socket.on("private", (userId, data) => {
-    console.log("Receivers userId: ", userId, " data: ", data);
-    socket.to(userId).emit("receive_private", data);
+  socket.on("send_message", (message) => {
+    let receiver_socket_id;
+    for (room_id in rooms) {
+      if (rooms[room_id].client_1.socket_id === socket.id) {
+        receiver_socket_id = rooms[room_id].client_2.socket_id;
+        break;
+      }
+      if (rooms[room_id].client_2.socket_id === socket.id) {
+        receiver_socket_id = rooms[room_id].client_1.socket_id;
+        break;
+      }
+    }
+    console.log("all clients:", clients);
+    console.log("all rooms:", rooms);
+    socket.to(receiver_socket_id).emit("receive_message", message);
   });
 
-  socket.on("send_message", (data) => {
-    console.log("Senders userId: ", socket.id, " data: ", data);
-    console.log("All userIds stored in local memory: ", users);
-    socket.to(data.room).emit("receive_message", data);
+  socket.on("disconnect", (reason) => {
+    console.log(
+      `client_id disconnected with socket_id: ${socket.id} for reason: ${reason}`
+    );
+    for (client_id in clients) {
+      if (clients[client_id].socket_id === socket.id) {
+        delete clients[client_id];
+        break;
+      }
+    }
   });
-
-  socket.on("disconnect",(reason)=>{
-    console.log(`SocketId disconnected with id ${socket.id} for reason: ${reason}`)
-  })
 });
 
 httpServer.listen(port, () => {
