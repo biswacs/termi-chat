@@ -114,18 +114,19 @@ export default function Home() {
       <div className="w-full max-w-4xl h-[85vh] flex flex-col bg-black border border-green-950 rounded-lg overflow-hidden">
         <div className="flex justify-between items-center h-12 px-4 border-b border-green-950">
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-green-600">STATUS:</span>
+            <span className="">STATUS:</span>
             {connected ? (
-              <span className="text-green-600 animate-pulse">[CONNECTED]</span>
+              <span className=" animate-pulse">[CONNECTED]</span>
             ) : (
               <ConnectingAnimation />
             )}
           </div>
+          <div className="flex items-center gap-2 text-md">{"<TERMI>"}</div>
           {connected && (
             <button
               onClick={disConnectRoomClient}
               disabled={!connected}
-              className="shadow-sm shadow-green-800 hover:shadow-green-600 disabled:text-green-800 text-green-600 font-mono px-2 py-1 rounded border border-green-950 transition-all text-sm disabled:cursor-not-allowed duration-200"
+              className="shadow-sm shadow-green-800 hover:shadow-green-600 disabled:text-green-800  font-mono px-2 py-1 rounded border border-green-950 transition-all text-xs disabled:cursor-not-allowed duration-200"
             >
               [DISCONNECT]
             </button>
@@ -155,7 +156,7 @@ export default function Home() {
                   {msg.text}
                 </div>
                 <div
-                  className={`text-xs text-green-600 mt-1 ${
+                  className={`text-xs  mt-1 ${
                     msg.sender === "user" ? "text-right" : "text-left"
                   }`}
                 >
@@ -177,14 +178,14 @@ export default function Home() {
                 placeholder="TYPE MESSAGE..."
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={handleKeyPress}
-                className="shadow-sm shadow-green-800 hover:shadow-green-600 w-full text-green-600 placeholder-green-800 px-4 py-3 rounded border border-green-950 focus:outline-none font-mono text-sm transition-all duration-200"
+                className="shadow-sm shadow-green-800 hover:shadow-green-600 w-full  placeholder-green-800 px-4 py-3 rounded border border-green-950 focus:outline-none font-mono text-sm transition-all duration-200"
                 disabled={!connected}
               />
             </div>
             <button
               onClick={sendMessage}
               disabled={!connected || !message.trim()}
-              className="shadow-sm shadow-green-800 hover:shadow-green-600 disabled:text-green-800 text-green-600 font-mono px-6 py-3 rounded border border-green-950 transition-all text-sm disabled:cursor-not-allowed duration-200"
+              className="shadow-sm shadow-green-800 hover:shadow-green-600 disabled:text-green-800  font-mono px-6 py-3 rounded border border-green-950 transition-all text-sm disabled:cursor-not-allowed duration-200"
             >
               [SEND]
             </button>
