@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
+import { Rewind } from "lucide-react";
 import socket from "@/apis/socket";
 import { v4 as uuidv4 } from "uuid";
 
@@ -66,7 +67,7 @@ export default function Home() {
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && connected) {
       e.preventDefault();
       sendMessage();
     }
@@ -111,7 +112,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-black text-cyan-400 font-mono p-4">
-      <div className="w-full max-w-4xl h-[85vh] flex flex-col bg-black border border-cyan-600 rounded-lg overflow-hidden">
+      <div className="w-full max-w-4xl h-[85vh] flex flex-col border border-cyan-600 rounded-lg overflow-hidden shadow-lg shadow-cyan-800">
         <div className="flex justify-between items-center h-14 px-4 border-b border-cyan-600 relative">
           <div className="flex items-center gap-2 text-sm px-2 py-1 rounded border border-cyan-600 shadow-md shadow-cyan-800">
             <span>TERMI:</span>
@@ -126,9 +127,9 @@ export default function Home() {
             <button
               onClick={disConnectRoomClient}
               disabled={!connected}
-              className="shadow-sm text-yellow-800 font-mono px-2 py-1 rounded border border-yellow-800 transition-all text-sm disabled:cursor-not-allowed duration-200"
+              className="shadow-sm disabled:opacity-80 text-yellow-400 font-mono px-2 py-1 rounded border border-yellow-600 transition-all disabled:cursor-not-allowed duration-200 rotate-180"
             >
-              DISCONNECT
+              <Rewind className="size-5"/>
             </button>
           </div>
         </div>
@@ -178,14 +179,13 @@ export default function Home() {
                 placeholder="TYPE MESSAGE..."
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={handleKeyPress}
-                className="shadow-md shadow-cyan-800 hover:shadow-cyan-600 w-full  placeholder-white text-white px-4 py-3 rounded border border-cyan-600 focus:outline-none font-mono text-sm transition-all duration-200"
-                disabled={!connected}
+                className="shadow-md shadow-green-800 hover:shadow-green-600 w-full  placeholder-white text-white px-4 py-3 rounded border border-green-600 focus:outline-none font-mono text-sm transition-all duration-200"
               />
             </div>
             <button
               onClick={sendMessage}
               disabled={!connected || !message.trim()}
-              className="shadow-md shadow-cyan-800 hover:shadow-cyan-600 font-mono px-6 py-3 rounded border border-cyan-600 transition-all text-sm disabled:cursor-not-allowed duration-200"
+              className="shadow-md shadow-green-800 text-white hover:shadow-green-600 font-mono px-4 py-3 rounded border border-green-600 transition-all text-sm disabled:cursor-not-allowed duration-200"
             >
               [SEND]
             </button>
