@@ -20,7 +20,6 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [connected, setConnected] = useState(false);
-  const [systemMessage, setSystemMessage] = useState("");
   const messagesEndRef = useRef(null);
   const client_id_ref = useRef("");
 
@@ -74,7 +73,6 @@ export default function Home() {
     socket.on("registration_complete", (room) => {
       console.log("connected: ", room);
       setConnected(true);
-      setSystemMessage("CONNECTED");
     });
 
     socket.on("receive_message", (message) => {
@@ -90,8 +88,8 @@ export default function Home() {
     socket.on("room_disconnected", () => {
       console.log("room_disconnected");
       setConnected(false);
-      setSystemMessage("DISCONNECTED");
-      registerClient();
+      setMessages([]);
+      socket.emit("re-register", { client_id: client_id_ref });
     });
 
     registerClient();
@@ -128,14 +126,6 @@ export default function Home() {
           }}
           className="flex-1 overflow-y-auto p-6 space-y-4"
         >
-          {systemMessage && (
-            <div className="flex justify-center">
-              <div className="border border-green-950 rounded px-3 py-1 text-xs text-green-600">
-                {systemMessage.toLowerCase()}
-              </div>
-            </div>
-          )}
-
           {messages.map((msg, index) => (
             <div
               key={index}

@@ -65,7 +65,7 @@ io.on("connection", (socket) => {
     socket.to(receiver_socket_id).emit("receive_message", message);
   });
 
-  socket.on("disconnect", (reason) => {
+  socket.on("disconnect", () => {
     for (client_id in clients) {
       if (clients[client_id].socket_id === socket.id) {
         delete clients[client_id];
@@ -89,6 +89,15 @@ io.on("connection", (socket) => {
         io.to(receiver_socket_id).emit("room_disconnected");
       }
     }
+    console.log("clients: ", Object.keys(clients).length);
+    console.log("rooms: ", Object.keys(rooms).length);
+  });
+
+  socket.on("re-register", (data) => {
+    console.log("re-registering client");
+    clients[data.client_id] = {
+      socket_id: socket.id,
+    };
     console.log("clients: ", Object.keys(clients).length);
     console.log("rooms: ", Object.keys(rooms).length);
   });
