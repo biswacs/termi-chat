@@ -112,7 +112,7 @@ export default function Home() {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-black text-green-600 font-mono p-4">
       <div className="w-full max-w-4xl h-[85vh] flex flex-col bg-black border border-green-950 rounded-lg overflow-hidden">
-        <div className="flex justify-between items-center h-12 px-4 border-b border-green-950">
+        <div className="flex justify-between items-center h-12 px-4 border-b border-green-950 relative">
           <div className="flex items-center gap-2 text-xs">
             <span className="">STATUS:</span>
             {connected ? (
@@ -121,16 +121,20 @@ export default function Home() {
               <ConnectingAnimation />
             )}
           </div>
-          <div className="flex items-center gap-2 text-md">{"<TERMI>"}</div>
-          {connected && (
-            <button
-              onClick={disConnectRoomClient}
-              disabled={!connected}
-              className="shadow-sm shadow-green-800 hover:shadow-green-600 disabled:text-green-800  font-mono px-2 py-1 rounded border border-green-950 transition-all text-xs disabled:cursor-not-allowed duration-200"
-            >
-              [DISCONNECT]
-            </button>
-          )}
+          <div className="flex items-center gap-2 text-md absolute left-1/2 transform -translate-x-1/2">
+            {"<TERMI>"}
+          </div>
+          <div>
+            {connected && (
+              <button
+                onClick={disConnectRoomClient}
+                disabled={!connected}
+                className="shadow-sm shadow-green-800 hover:shadow-green-600 disabled:text-green-800  font-mono px-2 py-1 rounded border border-green-950 transition-all text-xs disabled:cursor-not-allowed duration-200"
+              >
+                [DISCONNECT]
+              </button>
+            )}
+          </div>
         </div>
 
         <div
