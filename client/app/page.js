@@ -13,7 +13,7 @@ const ConnectingAnimation = () => {
     return () => clearInterval(interval);
   }, []);
 
-  return <span className="text-yellow-400">[CONNECTING{dots}]</span>;
+  return <span className="text-yellow-400">CONNECTING{dots}</span>;
 };
 
 export default function Home() {
@@ -110,30 +110,26 @@ export default function Home() {
   }, [messages]);
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-black text-green-600 font-mono p-4">
-      <div className="w-full max-w-4xl h-[85vh] flex flex-col bg-black border border-green-950 rounded-lg overflow-hidden">
-        <div className="flex justify-between items-center h-12 px-4 border-b border-green-950 relative">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="">STATUS:</span>
+    <div className="min-h-screen w-full flex items-center justify-center bg-black text-cyan-400 font-mono p-4">
+      <div className="w-full max-w-4xl h-[85vh] flex flex-col bg-black border border-cyan-600 rounded-lg overflow-hidden">
+        <div className="flex justify-between items-center h-14 px-4 border-b border-cyan-600 relative">
+          <div className="flex items-center gap-2 text-sm px-2 py-1 rounded border border-cyan-600 shadow-md shadow-cyan-800">
+            <span>TERMI:</span>
             {connected ? (
-              <span className=" animate-pulse">[CONNECTED]</span>
+              <span className="animate-pulse text-green-400">CONNECTED</span>
             ) : (
               <ConnectingAnimation />
             )}
           </div>
-          <div className="flex items-center gap-2 text-md absolute left-1/2 transform -translate-x-1/2">
-            {"<TERMI>"}
-          </div>
+
           <div>
-            {connected && (
-              <button
-                onClick={disConnectRoomClient}
-                disabled={!connected}
-                className="shadow-sm shadow-green-800 hover:shadow-green-600 disabled:text-green-800  font-mono px-2 py-1 rounded border border-green-950 transition-all text-xs disabled:cursor-not-allowed duration-200"
-              >
-                [DISCONNECT]
-              </button>
-            )}
+            <button
+              onClick={disConnectRoomClient}
+              disabled={!connected}
+              className="shadow-sm text-yellow-800 font-mono px-2 py-1 rounded border border-yellow-800 transition-all text-sm disabled:cursor-not-allowed duration-200"
+            >
+              DISCONNECT
+            </button>
           </div>
         </div>
 
@@ -156,7 +152,7 @@ export default function Home() {
                   msg.sender === "user" ? "ml-auto" : "mr-auto"
                 }`}
               >
-                <div className="px-3 py-1.5 rounded-lg border border-green-950 text-sm leading-relaxed break-words">
+                <div className="px-3 py-1.5 rounded-lg border border-cyan-600 text-sm leading-relaxed break-words text-white">
                   {msg.text}
                 </div>
                 <div
@@ -173,7 +169,7 @@ export default function Home() {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="border-t border-green-950 bg-black p-4">
+        <div className="border-t border-cyan-600 bg-black p-4">
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <input
@@ -182,14 +178,14 @@ export default function Home() {
                 placeholder="TYPE MESSAGE..."
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={handleKeyPress}
-                className="shadow-sm shadow-green-800 hover:shadow-green-600 w-full  placeholder-green-800 px-4 py-3 rounded border border-green-950 focus:outline-none font-mono text-sm transition-all duration-200"
+                className="shadow-md shadow-cyan-800 hover:shadow-cyan-600 w-full  placeholder-white text-white px-4 py-3 rounded border border-cyan-600 focus:outline-none font-mono text-sm transition-all duration-200"
                 disabled={!connected}
               />
             </div>
             <button
               onClick={sendMessage}
               disabled={!connected || !message.trim()}
-              className="shadow-sm shadow-green-800 hover:shadow-green-600 disabled:text-green-800  font-mono px-6 py-3 rounded border border-green-950 transition-all text-sm disabled:cursor-not-allowed duration-200"
+              className="shadow-md shadow-cyan-800 hover:shadow-cyan-600 font-mono px-6 py-3 rounded border border-cyan-600 transition-all text-sm disabled:cursor-not-allowed duration-200"
             >
               [SEND]
             </button>
