@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: "TERMI",
-  description: "termi, instant, anonymous chats for techies",
+  description: "instant, anonymous chats for techies",
 };
 
 export default function RootLayout({ children }) {
