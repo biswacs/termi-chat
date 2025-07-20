@@ -21,31 +21,26 @@ export default function Home() {
   const [messages, setMessages] = useState([]);
   const [connected, setConnected] = useState(false);
   const messagesEndRef = useRef(null);
-  const client_id_ref = useRef("");
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const registerClient = () => {
-    console.log("registering client");
+  const getClientId = () => {
     let client_id = localStorage.getItem("client_id");
     if (!client_id) {
       client_id = uuidv4();
       localStorage.setItem("client_id", client_id);
     }
-    client_id_ref.current = client_id;
-    navigator.geolocation.getCurrentPosition(
-      (data) => {
-        socket.emit("register_client", {
-          client_id,
-          latitude: data.coords.latitude,
-          longitude: data.coords.longitude,
-        });
-      },
-      (error) => console.log(error),
-      { enableHighAccuracy: true, timeout: 5000 }
-    );
+    return client_id;
+  };
+
+  const registerClient = () => {
+    console.log("registering client");
+    const client_id = getClientId();
+    socket.emit("register_client", {
+      client_id,
+    });
   };
 
   const sendMessage = () => {
@@ -60,6 +55,14 @@ export default function Home() {
       socket.emit("send_message", message);
       setMessage("");
     }
+  };
+
+  const disConnectRoomClient = () => {
+    socket.emit("disconnect_room_client");
+    setConnected(false);
+    setMessages([]);
+    const client_id = getClientId();
+    socket.emit("re-register", { client_id });
   };
 
   const handleKeyPress = (e) => {
@@ -86,10 +89,11 @@ export default function Home() {
     });
 
     socket.on("room_disconnected", () => {
-      console.log("room_disconnected");
+      console.log("room_disconnected", socket.id);
       setConnected(false);
       setMessages([]);
-      socket.emit("re-register", { client_id: client_id_ref });
+      const client_id = getClientId();
+      socket.emit("re-register", { client_id });
     });
 
     registerClient();
@@ -108,7 +112,7 @@ export default function Home() {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-black text-green-600 font-mono p-4">
       <div className="w-full max-w-4xl h-[85vh] flex flex-col bg-black border border-green-950 rounded-lg overflow-hidden">
-        <div className="flex justify-between items-center p-4 border-b border-green-950">
+        <div className="flex justify-between items-center h-12 px-4 border-b border-green-950">
           <div className="flex items-center gap-2 text-xs">
             <span className="text-green-600">STATUS:</span>
             {connected ? (
@@ -117,6 +121,15 @@ export default function Home() {
               <ConnectingAnimation />
             )}
           </div>
+          {connected && (
+            <button
+              onClick={disConnectRoomClient}
+              disabled={!connected}
+              className="shadow-sm shadow-green-800 hover:shadow-green-600 disabled:text-green-800 text-green-600 font-mono px-2 py-1 rounded border border-green-950 transition-all text-sm disabled:cursor-not-allowed duration-200"
+            >
+              [DISCONNECT]
+            </button>
+          )}
         </div>
 
         <div

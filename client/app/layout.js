@@ -12,8 +12,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "chat",
-  description: "hyper local chat",
+  title: "termi-chat",
+  description: "quick anom talks for techies",
 };
 
 export default function RootLayout({ children }) {

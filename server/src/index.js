@@ -35,8 +35,6 @@ io.on("connection", (socket) => {
     console.log("registering client: ", data.client_id);
     clients[data.client_id] = {
       socket_id: socket.id,
-      latitude: data.latitude,
-      longitude: data.longitude,
     };
     const room = match_clients(clients);
     if (!room) {
@@ -60,8 +58,6 @@ io.on("connection", (socket) => {
         break;
       }
     }
-    console.log("clients: ", Object.keys(clients).length);
-    console.log("rooms: ", Object.keys(rooms).length);
     socket.to(receiver_socket_id).emit("receive_message", message);
   });
 
@@ -89,17 +85,34 @@ io.on("connection", (socket) => {
         io.to(receiver_socket_id).emit("room_disconnected");
       }
     }
+  });
+
+  socket.on("re-register", (data) => {
+    clients[data.client_id] = {
+      socket_id: socket.id,
+    };
+    const room = match_clients(clients);
+    if (!room) {
+      return null;
+    }
+    io.to(room.client_1.socket_id).emit("registration_complete", room);
+    io.to(room.client_2.socket_id).emit("registration_complete", room);
     console.log("clients: ", Object.keys(clients).length);
     console.log("rooms: ", Object.keys(rooms).length);
   });
 
-  socket.on("re-register", (data) => {
-    console.log("re-registering client");
-    clients[data.client_id] = {
-      socket_id: socket.id,
-    };
-    console.log("clients: ", Object.keys(clients).length);
-    console.log("rooms: ", Object.keys(rooms).length);
+  socket.on("disconnect_room_client", () => {
+    for (room_id in rooms) {
+      let receiver_socket_id;
+      if (rooms[room_id].client_1.socket_id === socket.id) {
+        receiver_socket_id = rooms[room_id].client_2.socket_id;
+        delete rooms[room_id];
+      } else if (rooms[room_id].client_2.socket_id === socket.id) {
+        receiver_socket_id = rooms[room_id].client_1.socket_id;
+        delete rooms[room_id];
+      }
+      io.to([receiver_socket_id, socket.id]).emit("room_disconnected");
+    }
   });
 });
 
