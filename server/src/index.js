@@ -1,9 +1,10 @@
 const { createServer } = require("http");
 const { Server } = require("socket.io");
 const { v4: uuidv4 } = require("uuid");
+const app = require("express")();
 const port = 8000;
 
-const httpServer = createServer();
+const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: "*",
@@ -12,6 +13,10 @@ const io = new Server(httpServer, {
 
 let clients = {};
 let rooms = {};
+
+app.get("/", (req, res) => {
+  res.status(200).json({ data: "termi is up" });
+});
 
 const match_clients = (clients) => {
   const keys = Object.keys(clients);
