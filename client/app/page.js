@@ -20,6 +20,7 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [connected, setConnected] = useState(false);
+  const [systemMessage, setSystemMessage] = useState("");
   const messagesEndRef = useRef(null);
   const client_id_ref = useRef("");
 
@@ -28,13 +29,13 @@ export default function Home() {
   };
 
   const registerClient = () => {
+    console.log("registering client");
     let client_id = localStorage.getItem("client_id");
     if (!client_id) {
       client_id = uuidv4();
       localStorage.setItem("client_id", client_id);
     }
     client_id_ref.current = client_id;
-
     navigator.geolocation.getCurrentPosition(
       (data) => {
         socket.emit("register_client", {
@@ -43,7 +44,7 @@ export default function Home() {
           longitude: data.coords.longitude,
         });
       },
-      (error) => console.error(error),
+      (error) => console.log(error),
       { enableHighAccuracy: true, timeout: 5000 }
     );
   };
@@ -73,14 +74,7 @@ export default function Home() {
     socket.on("registration_complete", (room) => {
       console.log("connected: ", room);
       setConnected(true);
-      setMessages((prev) => [
-        ...prev,
-        {
-          sender: "system",
-          text: "connected.",
-          timestamp: new Date().toLocaleTimeString(),
-        },
-      ]);
+      setSystemMessage("CONNECTED");
     });
 
     socket.on("receive_message", (message) => {
@@ -96,14 +90,7 @@ export default function Home() {
     socket.on("room_disconnected", () => {
       console.log("room_disconnected");
       setConnected(false);
-      setMessages((prev) => [
-        ...prev,
-        {
-          sender: "system",
-          text: "disconnected.",
-          timestamp: new Date().toLocaleTimeString(),
-        },
-      ]);
+      setSystemMessage("DISCONNECTED");
       registerClient();
     });
 
@@ -141,46 +128,38 @@ export default function Home() {
           }}
           className="flex-1 overflow-y-auto p-6 space-y-4"
         >
+          {systemMessage && (
+            <div className="flex justify-center">
+              <div className="border border-green-950 rounded px-3 py-1 text-xs text-green-600">
+                {systemMessage.toLowerCase()}
+              </div>
+            </div>
+          )}
+
           {messages.map((msg, index) => (
             <div
               key={index}
               className={`flex ${
-                msg.sender === "user"
-                  ? "justify-end"
-                  : msg.sender === "system"
-                  ? "justify-center"
-                  : "justify-start"
+                msg.sender === "user" ? "justify-end" : "justify-start"
               }`}
             >
-              {msg.sender === "system" ? (
-                <div className="border border-green-950 rounded px-3 py-1 text-xs text-green-600">
+              <div
+                className={`max-w-[70%] ${
+                  msg.sender === "user" ? "ml-auto" : "mr-auto"
+                }`}
+              >
+                <div className="px-3 py-1.5 rounded-lg border border-green-950 text-sm leading-relaxed break-words">
                   {msg.text}
                 </div>
-              ) : (
                 <div
-                  className={`max-w-[70%] ${
-                    msg.sender === "user" ? "ml-auto" : "mr-auto"
+                  className={`text-xs text-green-600 mt-1 ${
+                    msg.sender === "user" ? "text-right" : "text-left"
                   }`}
                 >
-                  <div
-                    className={
-                      "px-3 py-1.5 rounded-lg border border-green-950 text-sm leading-relaxed break-words"
-                    }
-                  >
-                    {msg.text}
-                  </div>
-                  <div
-                    className={`text-xs text-green-600 mt-1 ${
-                      msg.sender === "user" ? "text-right" : "text-left"
-                    }`}
-                  >
-                    <div className="text-xs text-green-600 mt-1 opacity-60">
-                      {msg.timestamp} ·{" "}
-                      {msg.sender === "user" ? "YOU" : "REMOTE_USER"}
-                    </div>
-                  </div>
+                  {msg.timestamp} ·{" "}
+                  {msg.sender === "user" ? "YOU" : "REMOTE_USER"}
                 </div>
-              )}
+              </div>
             </div>
           ))}
           <div ref={messagesEndRef} />
@@ -195,14 +174,14 @@ export default function Home() {
                 placeholder="TYPE MESSAGE..."
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={handleKeyPress}
-                className="bg-green-950/10 shadow-md shadow-green-800 hover:shadow-green-600 w-full text-green-600 placeholder-green-800 px-4 py-3 rounded border border-green-950 focus:outline-none font-mono text-sm transition-all duration-200"
+                className="shadow-sm shadow-green-800 hover:shadow-green-600 w-full text-green-600 placeholder-green-800 px-4 py-3 rounded border border-green-950 focus:outline-none font-mono text-sm transition-all duration-200"
                 disabled={!connected}
               />
             </div>
             <button
               onClick={sendMessage}
               disabled={!connected || !message.trim()}
-              className="bg-green-950/10 shadow-md shadow-green-800 hover:shadow-green-600 disabled:text-green-800 text-green-600 font-mono px-6 py-3 rounded border border-green-950 transition-all text-sm disabled:cursor-not-allowed duration-200"
+              className="shadow-sm shadow-green-800 hover:shadow-green-600 disabled:text-green-800 text-green-600 font-mono px-6 py-3 rounded border border-green-950 transition-all text-sm disabled:cursor-not-allowed duration-200"
             >
               [SEND]
             </button>
