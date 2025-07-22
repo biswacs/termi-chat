@@ -66,21 +66,6 @@ io.on("connection", (socket) => {
     socket.to(receiver_socket_id).emit("receive_message", message);
   });
 
-  socket.on("send_audio_stream", (AudioData) => {
-    let receiver_socket_id;
-    for (room_id in rooms) {
-      if (rooms[room_id].client_1.socket_id === socket.id) {
-        receiver_socket_id = rooms[room_id].client_2.socket_id;
-        break;
-      }
-      if (rooms[room_id].client_2.socket_id === socket.id) {
-        receiver_socket_id = rooms[room_id].client_1.socket_id;
-        break;
-      }
-    }
-    socket.to(receiver_socket_id).emit("receive_audio_stream", AudioData);
-  });
-
   socket.on("disconnect", () => {
     for (client_id in clients) {
       if (clients[client_id].socket_id === socket.id) {
