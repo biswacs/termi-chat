@@ -4,7 +4,6 @@ import { Server } from "socket.io";
 import express from "express";
 import client from "./config/redis.js";
 import socketConnection from "./socket/index.js";
-import { sequelize } from "./model/index.js";
 
 const port = 8000;
 const app = express();
@@ -17,16 +16,8 @@ const io = new Server(httpServer, {
 
 socketConnection(io);
 
-import userRoutes from "./routes/user.route.js";
-app.use("/v1/user", userRoutes);
-
 const start = async () => {
   try {
-    await sequelize.authenticate();
-    console.log("database connected");
-    await sequelize.sync({ alter: true });
-    console.log("database synced");
-
     client.connect();
     console.log("redis connected");
 

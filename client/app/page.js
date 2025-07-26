@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Rewind } from "lucide-react";
 import socket from "@/apis/socket";
 import { v4 as uuidv4 } from "uuid";
@@ -21,11 +22,25 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [connected, setConnected] = useState(false);
+  const [username, setUsername] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const messagesEndRef = useRef(null);
+  const router = useRouter();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  // Check authentication on component mount
+  useEffect(() => {
+    const storedUsername = localStorage.getItem("username");
+    if (!storedUsername) {
+      router.push("/login");
+      return;
+    }
+    setUsername(storedUsername);
+    setIsLoading(false);
+  }, [router]);
 
   const getClientId = () => {
     let client_id = localStorage.getItem("client_id");
@@ -73,7 +88,15 @@ export default function Home() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("username");
+    localStorage.removeItem("client_id");
+    router.push("/login");
+  };
+
   useEffect(() => {
+    if (isLoading) return;
+
     socket.on("registration_complete", (room) => {
       console.log("connected: ", room);
       setConnected(true);
@@ -104,32 +127,54 @@ export default function Home() {
       socket.off("receive_message");
       socket.off("room_disconnected");
     };
-  }, []);
+  }, [isLoading]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-[#080808] text-cyan-400 font-mono">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400 mx-auto mb-4"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#080808] text-cyan-400 font-mono p-4">
       <div className="w-full max-w-4xl h-[85vh] flex flex-col border border-cyan-400 rounded-lg overflow-hidden shadow-md shadow-cyan-400">
         <div className="flex justify-between items-center p-4 border-b border-cyan-400 relative">
-          <div className="flex items-center gap-2 text-sm px-2 py-1 rounded border border-green-400 shadow-md shadow-green-400">
-            <span className="text-green-400">TERMI:</span>
-            {connected ? (
-              <span className="animate-pulse text-green-400">CONNECTED</span>
-            ) : (
-              <ConnectingAnimation />
-            )}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm px-2 py-1 rounded border border-green-400 shadow-md shadow-green-400">
+              <span className="text-green-400">TERMI:</span>
+              {connected ? (
+                <span className="animate-pulse text-green-400">CONNECTED</span>
+              ) : (
+                <ConnectingAnimation />
+              )}
+            </div>
+            <div className="text-sm text-white">
+              Welcome, <span className="text-cyan-400">{username}</span>
+            </div>
           </div>
 
-          <div>
+          <div className="flex items-center gap-2">
             <button
               onClick={disConnectRoomClient}
               disabled={!connected}
               className="shadow-md shadow-green-400 disabled:opacity-80 text-green-400 font-mono px-2 py-1 rounded border border-green-400 transition-all disabled:cursor-not-allowed duration-200"
             >
               <Rewind className="size-5 rotate-180" />
+            </button>
+            <button
+              onClick={handleLogout}
+              className="shadow-md shadow-red-400 text-red-400 font-mono px-2 py-1 rounded border border-red-400 transition-all duration-200 hover:bg-red-400 hover:text-black"
+            >
+              LOGOUT
             </button>
           </div>
         </div>
