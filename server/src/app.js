@@ -16,7 +16,7 @@ const io = new Server(httpServer, {
 
 socketConnection(io);
 
-const start = async () => {
+const startServer = async () => {
   try {
     client.connect();
     console.log("redis connected");
@@ -29,4 +29,4 @@ const start = async () => {
   }
 };
 
-start();
+startServer();
