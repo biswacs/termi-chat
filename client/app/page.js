@@ -1,39 +1,18 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { Rewind } from "lucide-react";
-import { useAuth } from "./context/auth";
 import socket from "@/apis/socket";
 import { v4 as uuidv4 } from "uuid";
-
-const ConnectingAnimation = () => {
-  const [dots, setDots] = useState("");
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDots((prev) => (prev === "..." ? "" : prev + "."));
-    }, 500);
-    return () => clearInterval(interval);
-  }, []);
-
-  return <span className="text-cyan-400">CONNECTING{dots}</span>;
-};
 
 export default function Home() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [connected, setConnected] = useState(false);
-  const { user, isLoading, logout } = useAuth();
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      window.location.href = "/login";
-    }
-  }, [isLoading, user]);
 
   const getClientId = () => {
     let client_id = localStorage.getItem("client_id");
@@ -81,15 +60,7 @@ export default function Home() {
     }
   };
 
-  const handleLogout = () => {
-    setConnected(false);
-    setMessages([]);
-    logout();
-  };
-
   useEffect(() => {
-    if (isLoading) return;
-
     socket.on("registration_complete", (room) => {
       console.log("connected: ", room);
       setConnected(true);
@@ -120,22 +91,11 @@ export default function Home() {
       socket.off("receive_message");
       socket.off("room_disconnected");
     };
-  }, [isLoading]);
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-[#080808] text-cyan-400 font-mono">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400 mx-auto mb-4"></div>
-          <p>Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#080808] text-cyan-400 font-mono p-4">
@@ -147,11 +107,8 @@ export default function Home() {
               {connected ? (
                 <span className="animate-pulse text-green-400">CONNECTED</span>
               ) : (
-                <ConnectingAnimation />
+                <span className="animate-pulse text-white">CONNECTING...</span>
               )}
-            </div>
-            <div className="text-sm text-white">
-              Welcome, <span className="text-cyan-400">{user?.username}</span>
             </div>
           </div>
 
@@ -162,12 +119,6 @@ export default function Home() {
               className="shadow-md shadow-green-400 disabled:opacity-80 text-green-400 font-mono px-2 py-1 rounded border border-green-400 transition-all disabled:cursor-not-allowed duration-200"
             >
               <Rewind className="size-5 rotate-180" />
-            </button>
-            <button
-              onClick={handleLogout}
-              className="shadow-md shadow-red-400 text-red-400 font-mono px-2 py-1 rounded border border-red-400 transition-all duration-200 hover:bg-red-400 hover:text-black"
-            >
-              LOGOUT
             </button>
           </div>
         </div>
