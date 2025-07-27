@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 let clients = {};
 let rooms = {};
+
 function socketConnection(io) {
   const match_clients = (clients) => {
     const keys = Object.keys(clients);
