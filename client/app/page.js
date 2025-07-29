@@ -169,7 +169,7 @@ export default function Home() {
             <button
               type="submit"
               disabled={!isUsernameValid()}
-              className="w-full px-4 py-3 rounded font-mono transition-all disabled:opacity-80 disabled:cursor-not-allowed bg-green-400 text-black"
+              className="w-full px-4 py-3 rounded font-mono transition-all disabled:opacity-80 disabled:cursor-not-allowed bg-green-400 text-white"
             >
               START CHATTING
             </button>
