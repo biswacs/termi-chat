@@ -8,26 +8,27 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [connected, setConnected] = useState(false);
+  const [userId, setUserId] = useState("");
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const getClientId = () => {
-    let client_id = localStorage.getItem("client_id");
-    if (!client_id) {
-      client_id = uuidv4();
-      localStorage.setItem("client_id", client_id);
+  const getUserId = () => {
+    let storedUserId = localStorage.getItem("userId");
+    if (!storedUserId) {
+      storedUserId = uuidv4();
+      localStorage.setItem("userId", storedUserId);
     }
-    return client_id;
+    return storedUserId;
   };
 
-  const registerClient = () => {
-    console.log("registering client");
-    const client_id = getClientId();
-    socket.emit("register_client", {
-      client_id,
+  const registerUser = () => {
+    const userId = getUserId();
+    setUserId(userId);
+    socket.emit("register_user", {
+      userId: userId,
     });
   };
 
@@ -40,17 +41,20 @@ export default function Home() {
       };
 
       setMessages((prev) => [...prev, newMsg]);
-      socket.emit("send_message", message);
+      socket.emit("send_message", {
+        userId: userId,
+        message,
+      });
       setMessage("");
     }
   };
 
-  const disConnectRoomClient = () => {
-    socket.emit("disconnect_room_client");
+  const disConnectRoomUser = () => {
+    socket.emit("disconnect_room", {
+      userId: userId,
+    });
     setConnected(false);
     setMessages([]);
-    const client_id = getClientId();
-    socket.emit("re-register", { client_id });
   };
 
   const handleKeyPress = (e) => {
@@ -61,13 +65,11 @@ export default function Home() {
   };
 
   useEffect(() => {
-    socket.on("registration_complete", (room) => {
-      console.log("connected: ", room);
+    socket.on("registration_complete", (roomId) => {
       setConnected(true);
     });
 
     socket.on("receive_message", (message) => {
-      console.log("received: ", message);
       const newMsg = {
         sender: "remote",
         text: message,
@@ -77,14 +79,11 @@ export default function Home() {
     });
 
     socket.on("room_disconnected", () => {
-      console.log("room_disconnected", socket.id);
       setConnected(false);
       setMessages([]);
-      const client_id = getClientId();
-      socket.emit("re-register", { client_id });
     });
 
-    registerClient();
+    registerUser();
 
     return () => {
       socket.off("registration_complete");
@@ -114,7 +113,7 @@ export default function Home() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={disConnectRoomClient}
+              onClick={disConnectRoomUser}
               disabled={!connected}
               className="shadow-md shadow-green-400 disabled:opacity-80 text-green-400 font-mono px-2 py-1 rounded border border-green-400 transition-all disabled:cursor-not-allowed duration-200"
             >

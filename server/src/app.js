@@ -9,6 +9,7 @@ const io = new Server(httpServer, {
     origin: "*",
   },
 });
+
 socketConnection(io);
 
 const startServer = async () => {
