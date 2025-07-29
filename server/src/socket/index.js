@@ -1,7 +1,7 @@
 import redis from "../config/redis.js";
 import { matchMaker } from "./worker.js";
 
-async function disconnectUser(userId, socket, io) {
+async function disconnectUser(userId, socket, io, isManualDisconnect = false) {
   const roomId = await redis.hget("USER_TO_ROOM", userId);
 
   if (roomId) {
@@ -22,11 +22,22 @@ async function disconnectUser(userId, socket, io) {
     await redis.hdel("USER_TO_ROOM", userId);
     await redis.del(`ROOM:${roomId}`);
   }
+
+  if (isManualDisconnect) {
+    await redis.lpush("WAITING_QUEUE", userId);
+    await matchMaker(io);
+  }
 }
 
 function socketConnection(io) {
   io.on("connection", (socket) => {
     socket.on("register_user", async (data) => {
+      console.log("register_user", data);
+      const existingSocket = await redis.hget("USERS", data.userId);
+      if (existingSocket) {
+        await redis.hdel("SOCKET_TO_USER", existingSocket);
+      }
+
       await redis.hset("USERS", data.userId, socket.id);
       await redis.hset("SOCKET_TO_USER", socket.id, data.userId);
       await redis.lpush("WAITING_QUEUE", data.userId);
@@ -48,7 +59,7 @@ function socketConnection(io) {
 
     socket.on("disconnect_room", async (data) => {
       const userId = data.userId;
-      await disconnectUser(userId, socket, io);
+      await disconnectUser(userId, socket, io, true);
     });
 
     socket.on("disconnect", async () => {
@@ -56,7 +67,7 @@ function socketConnection(io) {
 
       if (disconnectedUserId) {
         await redis.hdel("SOCKET_TO_USER", socket.id);
-        await disconnectUser(disconnectedUserId, socket, io);
+        await disconnectUser(disconnectedUserId, socket, io, false);
       }
     });
   });

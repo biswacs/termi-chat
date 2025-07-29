@@ -52,6 +52,7 @@ export default function Home() {
   const disConnectRoomUser = () => {
     socket.emit("disconnect_room", {
       userId: userId,
+      isManualDisconnect: true,
     });
     setConnected(false);
     setMessages([]);
