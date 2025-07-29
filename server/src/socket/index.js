@@ -3,6 +3,7 @@ import { matchMaker } from "./worker.js";
 
 async function disconnectUser(userId, socket, io, isManualDisconnect = false) {
   const roomId = await redis.hget("USER_TO_ROOM", userId);
+  console.log("disconnecting user", userId);
 
   if (roomId) {
     const roomUsers = await redis.smembers(`ROOM:${roomId}`);
