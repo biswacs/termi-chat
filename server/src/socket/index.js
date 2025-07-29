@@ -3,7 +3,6 @@ import { matchMaker } from "./worker.js";
 
 async function disconnectUser(userId, socket, io, isManualDisconnect = false) {
   const roomId = await redis.hget("USER_TO_ROOM", userId);
-  console.log("disconnecting user", userId);
 
   if (roomId) {
     const roomUsers = await redis.smembers(`ROOM:${roomId}`);
@@ -45,8 +44,14 @@ function socketConnection(io) {
 
       await redis.hset("USERS", data.userId, socket.id);
       await redis.hset("SOCKET_TO_USER", socket.id, data.userId);
-      await redis.lpush("WAITING_QUEUE", data.userId);
-      await matchMaker(io);
+
+      const queueMembers = await redis.lrange("WAITING_QUEUE", 0, -1);
+      const isAlreadyInQueue = queueMembers.includes(data.userId);
+
+      if (!isAlreadyInQueue) {
+        await redis.lpush("WAITING_QUEUE", data.userId);
+        await matchMaker(io);
+      }
     });
 
     socket.on("send_message", async (data) => {
@@ -67,12 +72,18 @@ function socketConnection(io) {
 
     socket.on("disconnect_room", async (data) => {
       const userId = data.userId;
+      console.log("disconnect_room", { userId }, "username", await redis.hget("USERNAMES", userId));
       await disconnectUser(userId, socket, io, true);
     });
 
     socket.on("disconnect", async () => {
       const disconnectedUserId = await redis.hget("SOCKET_TO_USER", socket.id);
-
+      console.log(
+        "disconnect",
+        { disconnectedUserId },
+        "username",
+        await redis.hget("USERNAMES", disconnectedUserId)
+      );
       if (disconnectedUserId) {
         await redis.hdel("SOCKET_TO_USER", socket.id);
         await disconnectUser(disconnectedUserId, socket, io, false);

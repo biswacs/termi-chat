@@ -11,6 +11,13 @@ async function matchMaker(io) {
     await redis.hset("USER_TO_ROOM", user1, roomId);
     await redis.hset("USER_TO_ROOM", user2, roomId);
     await redis.sadd(`ROOM:${roomId}`, user1, user2);
+    console.log("match_made", {
+      user1Username: await redis.hget("USERNAMES", user1),
+      user1,
+      user2Username: await redis.hget("USERNAMES", user2),
+      user2,
+      roomId,
+    });
 
     const user1SocketId = await redis.hget("USERS", user1);
     const user2SocketId = await redis.hget("USERS", user2);
