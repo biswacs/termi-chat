@@ -16,8 +16,21 @@ async function matchMaker(io) {
     const user2SocketId = await redis.hget("USERS", user2);
 
     if (user1SocketId && user2SocketId) {
-      io.to(user1SocketId).emit("registration_complete", roomId);
-      io.to(user2SocketId).emit("registration_complete", roomId);
+      const user1Username = await redis.hget("USERNAMES", user1);
+      const user2Username = await redis.hget("USERNAMES", user2);
+
+      const roomData1 = {
+        roomId: roomId,
+        remoteUsername: user2Username,
+      };
+
+      const roomData2 = {
+        roomId: roomId,
+        remoteUsername: user1Username,
+      };
+
+      io.to(user1SocketId).emit("registration_complete", roomData1);
+      io.to(user2SocketId).emit("registration_complete", roomData2);
     }
   }
 }

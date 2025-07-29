@@ -33,6 +33,10 @@ function socketConnection(io) {
   io.on("connection", (socket) => {
     socket.on("register_user", async (data) => {
       console.log("register_user", data);
+      if (data.username) {
+        await redis.hset("USERNAMES", data.userId, data.username);
+      }
+
       const existingSocket = await redis.hget("USERS", data.userId);
       if (existingSocket) {
         await redis.hdel("SOCKET_TO_USER", existingSocket);
@@ -53,7 +57,10 @@ function socketConnection(io) {
       if (!otherUserId) return;
       const otherUserSocket = await redis.hget("USERS", otherUserId);
       if (otherUserSocket) {
-        socket.to(otherUserSocket).emit("receive_message", data.message);
+        socket.to(otherUserSocket).emit("receive_message", {
+          message: data.message,
+          senderUsername: await redis.hget("USERNAMES", userId),
+        });
       }
     });
 

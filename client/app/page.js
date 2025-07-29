@@ -9,6 +9,9 @@ export default function Home() {
   const [messages, setMessages] = useState([]);
   const [connected, setConnected] = useState(false);
   const [userId, setUserId] = useState("");
+  const [username, setUsername] = useState("");
+  const [remoteUsername, setRemoteUsername] = useState("");
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -16,19 +19,54 @@ export default function Home() {
   };
 
   const getUserId = () => {
-    let storedUserId = localStorage.getItem("userId");
-    if (!storedUserId) {
-      storedUserId = uuidv4();
-      localStorage.setItem("userId", storedUserId);
+    if (typeof window !== "undefined") {
+      let storedUserId = localStorage.getItem("userId");
+      if (!storedUserId) {
+        storedUserId = uuidv4();
+        localStorage.setItem("userId", storedUserId);
+      }
+      return storedUserId;
     }
-    return storedUserId;
+    return "";
+  };
+
+  const validateUsername = (value) => {
+    return /^[a-z0-9]+$/.test(value);
+  };
+
+  const handleUsernameChange = (e) => {
+    const value = e.target.value.toLowerCase();
+    if (validateUsername(value) || value === "") {
+      setUsername(value);
+    }
+  };
+
+  const isUsernameValid = () => {
+    return (
+      username.length >= 1 &&
+      username.length <= 16 &&
+      validateUsername(username)
+    );
+  };
+
+  const handleOnboardingSubmit = (e) => {
+    e.preventDefault();
+    if (isUsernameValid()) {
+      localStorage.setItem("username", username);
+      setShowOnboarding(false);
+      registerUser();
+    }
   };
 
   const registerUser = () => {
     const userId = getUserId();
+    const storedUsername = localStorage.getItem("username");
     setUserId(userId);
+    setUsername(storedUsername);
+
     socket.emit("register_user", {
       userId: userId,
+      username: storedUsername,
     });
   };
 
@@ -56,6 +94,7 @@ export default function Home() {
     });
     setConnected(false);
     setMessages([]);
+    setRemoteUsername("");
   };
 
   const handleKeyPress = (e) => {
@@ -66,14 +105,17 @@ export default function Home() {
   };
 
   useEffect(() => {
-    socket.on("registration_complete", (roomId) => {
+    socket.on("registration_complete", (roomData) => {
       setConnected(true);
+      if (roomData.remoteUsername) {
+        setRemoteUsername(roomData.remoteUsername);
+      }
     });
 
-    socket.on("receive_message", (message) => {
+    socket.on("receive_message", (messageData) => {
       const newMsg = {
         sender: "remote",
-        text: message,
+        text: messageData.message,
         timestamp: new Date().toLocaleTimeString(),
       };
       setMessages((prev) => [...prev, newMsg]);
@@ -82,7 +124,14 @@ export default function Home() {
     socket.on("room_disconnected", () => {
       setConnected(false);
       setMessages([]);
+      setRemoteUsername("");
     });
+
+    const storedUsername = localStorage.getItem("username");
+    if (!storedUsername) {
+      setShowOnboarding(true);
+      return;
+    }
 
     registerUser();
 
@@ -97,6 +146,39 @@ export default function Home() {
     scrollToBottom();
   }, [messages]);
 
+  if (showOnboarding) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-[#080808] text-cyan-400 font-mono p-4">
+        <div className="w-full max-w-md border border-cyan-400 rounded-lg p-8 shadow-md shadow-cyan-400">
+          <h1 className="text-2xl font-bold mb-6 text-center">
+            Welcome to TERMI
+          </h1>
+          <form onSubmit={handleOnboardingSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm mb-2">Enter your username:</label>
+              <input
+                type="text"
+                value={username}
+                maxLength={16}
+                onChange={handleUsernameChange}
+                placeholder="Your username..."
+                className="w-full px-4 py-3 rounded border border-white bg-transparent text-white placeholder-white focus:outline-none font-mono"
+                autoFocus
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={!isUsernameValid()}
+              className="w-full px-4 py-3 rounded font-mono transition-all disabled:opacity-80 disabled:cursor-not-allowed bg-green-400 text-black"
+            >
+              START CHATTING
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#080808] text-cyan-400 font-mono p-4">
       <div className="w-full max-w-4xl h-[85vh] flex flex-col border border-cyan-400 rounded-lg overflow-hidden shadow-md shadow-cyan-400">
@@ -105,7 +187,9 @@ export default function Home() {
             <div className="flex items-center gap-2 text-sm px-2 py-1 rounded border border-green-400 shadow-md shadow-green-400">
               <span className="text-green-400">TERMI:</span>
               {connected ? (
-                <span className="animate-pulse text-green-400">CONNECTED</span>
+                <span className="text-pink-400">
+                  CONNECTED {remoteUsername && `- ${remoteUsername}`}
+                </span>
               ) : (
                 <span className="animate-pulse text-white">CONNECTING...</span>
               )}
@@ -146,12 +230,12 @@ export default function Home() {
                   {msg.text}
                 </div>
                 <div
-                  className={`text-[10px]  mt-2 text-white ${
+                  className={`text-[10px] mt-2 text-white ${
                     msg.sender === "user" ? "text-right" : "text-left"
                   }`}
                 >
                   {msg.timestamp} ·{" "}
-                  {msg.sender === "user" ? "YOU" : "REMOTE_USER"}
+                  {msg.sender === "user" ? username : remoteUsername}
                 </div>
               </div>
             </div>
@@ -168,7 +252,7 @@ export default function Home() {
                 placeholder="TYPE MESSAGE..."
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={handleKeyPress}
-                className="shadow-md shadow-neutral-400 w-full  placeholder-white text-white px-4 py-3 rounded border border-neutral-400 focus:outline-none font-mono text-sm"
+                className="shadow-md shadow-neutral-400 w-full placeholder-white text-white px-4 py-3 rounded border border-neutral-400 focus:outline-none font-mono text-sm"
               />
             </div>
             <button
