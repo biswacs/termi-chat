@@ -64,6 +64,10 @@ export default function Home() {
     setUserId(userId);
     setUsername(storedUsername);
 
+    navigator.geolocation.getCurrentPosition(function (position) {
+      console.log(position.coords.latitude, position.coords.longitude);
+    });
+
     socket.emit("register_user", {
       userId: userId,
       username: storedUsername,
