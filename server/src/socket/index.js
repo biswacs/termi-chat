@@ -72,18 +72,18 @@ function socketConnection(io) {
 
     socket.on("disconnect_room", async (data) => {
       const userId = data.userId;
-      console.log("disconnect_room", { userId }, "username", await redis.hget("USERNAMES", userId));
+      console.log(
+        "disconnect_room",
+        { userId },
+        "username",
+        await redis.hget("USERNAMES", userId)
+      );
       await disconnectUser(userId, socket, io, true);
     });
 
     socket.on("disconnect", async () => {
       const disconnectedUserId = await redis.hget("SOCKET_TO_USER", socket.id);
-      console.log(
-        "disconnect",
-        { disconnectedUserId },
-        "username",
-        await redis.hget("USERNAMES", disconnectedUserId)
-      );
+      await redis.hget("USERNAMES", disconnectedUserId);
       if (disconnectedUserId) {
         await redis.hdel("SOCKET_TO_USER", socket.id);
         await disconnectUser(disconnectedUserId, socket, io, false);
