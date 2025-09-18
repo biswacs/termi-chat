@@ -1,21 +1,33 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { Rewind } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Volume2, VolumeX } from "lucide-react";
 import socket from "@/apis/socket";
 import { v4 as uuidv4 } from "uuid";
 
 export default function Home() {
-  const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState([]);
   const [connected, setConnected] = useState(false);
   const [userId, setUserId] = useState("");
   const [username, setUsername] = useState("");
   const [remoteUsername, setRemoteUsername] = useState("");
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const messagesEndRef = useRef(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [voiceActivity, setVoiceActivity] = useState(false);
+  const [remoteVoiceActivity, setRemoteVoiceActivity] = useState(false);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const localAudioRef = useRef(null);
+  const remoteAudioRef = useRef(null);
+  const peerConnectionRef = useRef(null);
+  const localStreamRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+
+  const iceServers = {
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+    ],
   };
 
   const getUserId = () => {
@@ -58,15 +70,196 @@ export default function Home() {
     }
   };
 
+  const initializeAudio = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      localStreamRef.current = stream;
+
+      audioContextRef.current = new (window.AudioContext ||
+        window.webkitAudioContext)();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 256;
+      source.connect(analyserRef.current);
+
+      monitorVoiceActivity();
+
+      return stream;
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      return null;
+    }
+  };
+
+  const monitorVoiceActivity = () => {
+    if (!analyserRef.current) return;
+
+    const bufferLength = analyserRef.current.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    const checkActivity = () => {
+      analyserRef.current.getByteFrequencyData(dataArray);
+      const average =
+        dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
+      setVoiceActivity(average > 30);
+      requestAnimationFrame(checkActivity);
+    };
+
+    checkActivity();
+  };
+
+  const setupRemoteVoiceDetection = (stream) => {
+    try {
+      const remoteAudioContext = new (window.AudioContext ||
+        window.webkitAudioContext)();
+      const remoteSource = remoteAudioContext.createMediaStreamSource(stream);
+      const remoteAnalyser = remoteAudioContext.createAnalyser();
+      remoteAnalyser.fftSize = 256;
+      remoteSource.connect(remoteAnalyser);
+
+      const bufferLength = remoteAnalyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const checkRemoteActivity = () => {
+        remoteAnalyser.getByteFrequencyData(dataArray);
+        const average =
+          dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
+        setRemoteVoiceActivity(average > 30);
+        requestAnimationFrame(checkRemoteActivity);
+      };
+
+      checkRemoteActivity();
+    } catch (error) {
+      console.error("Error setting up remote voice detection:", error);
+    }
+  };
+
+  const createPeerConnection = () => {
+    const pc = new RTCPeerConnection(iceServers);
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        socket.emit("webrtc_ice_candidate", {
+          userId: userId,
+          candidate: event.candidate,
+        });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = event.streams[0];
+
+        setupRemoteVoiceDetection(event.streams[0]);
+      }
+    };
+
+    return pc;
+  };
+
+  const startCall = async () => {
+    setIsConnecting(true);
+    const stream = await initializeAudio();
+    if (!stream) return;
+
+    const pc = createPeerConnection();
+    peerConnectionRef.current = pc;
+
+    stream.getTracks().forEach((track) => {
+      pc.addTrack(track, stream);
+    });
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    socket.emit("webrtc_offer", {
+      userId: userId,
+      offer: offer,
+    });
+  };
+
+  const handleOffer = async (data) => {
+    try {
+      const stream = await initializeAudio();
+      if (!stream) return;
+
+      const pc = createPeerConnection();
+      peerConnectionRef.current = pc;
+
+      stream.getTracks().forEach((track) => {
+        pc.addTrack(track, stream);
+      });
+
+      await pc.setRemoteDescription(data.offer);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      socket.emit("webrtc_answer", {
+        userId: userId,
+        answer: answer,
+      });
+
+      setIsConnecting(false);
+    } catch (error) {
+      console.error("Error handling offer:", error);
+    }
+  };
+
+  const handleAnswer = async (data) => {
+    if (
+      peerConnectionRef.current &&
+      peerConnectionRef.current.signalingState === "have-local-offer"
+    ) {
+      try {
+        await peerConnectionRef.current.setRemoteDescription(data.answer);
+        setIsConnecting(false);
+      } catch (error) {
+        console.error("Error setting remote answer:", error);
+      }
+    }
+  };
+
+  const handleIceCandidate = async (data) => {
+    if (
+      peerConnectionRef.current &&
+      peerConnectionRef.current.remoteDescription
+    ) {
+      try {
+        await peerConnectionRef.current.addIceCandidate(data.candidate);
+      } catch (error) {
+        console.error("Error adding ICE candidate:", error);
+      }
+    }
+  };
+
+  const toggleMute = () => {
+    if (localStreamRef.current) {
+      const audioTrack = localStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMuted(!audioTrack.enabled);
+      }
+    }
+  };
+
+  const toggleSpeaker = () => {
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = !remoteAudioRef.current.muted;
+      setIsSpeakerMuted(remoteAudioRef.current.muted);
+    }
+  };
+
   const registerUser = () => {
     const userId = getUserId();
     const storedUsername = localStorage.getItem("username");
     setUserId(userId);
     setUsername(storedUsername);
-
-    navigator.geolocation.getCurrentPosition(function (position) {
-      console.log(position.coords.latitude, position.coords.longitude);
-    });
 
     socket.emit("register_user", {
       userId: userId,
@@ -74,38 +267,32 @@ export default function Home() {
     });
   };
 
-  const sendMessage = () => {
-    if (message.trim() !== "") {
-      const newMsg = {
-        sender: "user",
-        text: message,
-        timestamp: new Date().toLocaleTimeString(),
-      };
-
-      setMessages((prev) => [...prev, newMsg]);
-      socket.emit("send_message", {
-        userId: userId,
-        message,
-      });
-      setMessage("");
+  const disconnectCall = () => {
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
     }
-  };
 
-  const disConnectRoomUser = () => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+    }
+
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
     socket.emit("disconnect_room", {
       userId: userId,
       isManualDisconnect: true,
     });
-    setConnected(false);
-    setMessages([]);
-    setRemoteUsername("");
-  };
 
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter" && !e.shiftKey && connected) {
-      e.preventDefault();
-      sendMessage();
-    }
+    setConnected(false);
+    setRemoteUsername("");
+    setIsConnecting(false);
+    setVoiceActivity(false);
+    setRemoteVoiceActivity(false);
   };
 
   useEffect(() => {
@@ -114,21 +301,18 @@ export default function Home() {
       if (roomData.remoteUsername) {
         setRemoteUsername(roomData.remoteUsername);
       }
+
+      if (roomData.isCaller) {
+        startCall();
+      }
     });
 
-    socket.on("receive_message", (messageData) => {
-      const newMsg = {
-        sender: "remote",
-        text: messageData.message,
-        timestamp: new Date().toLocaleTimeString(),
-      };
-      setMessages((prev) => [...prev, newMsg]);
-    });
+    socket.on("webrtc_offer", handleOffer);
+    socket.on("webrtc_answer", handleAnswer);
+    socket.on("webrtc_ice_candidate", handleIceCandidate);
 
     socket.on("room_disconnected", () => {
-      setConnected(false);
-      setMessages([]);
-      setRemoteUsername("");
+      disconnectCall();
     });
 
     const storedUsername = localStorage.getItem("username");
@@ -141,41 +325,41 @@ export default function Home() {
 
     return () => {
       socket.off("registration_complete");
-      socket.off("receive_message");
+      socket.off("webrtc_offer");
+      socket.off("webrtc_answer");
+      socket.off("webrtc_ice_candidate");
       socket.off("room_disconnected");
     };
-  }, []);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  }, [userId]);
 
   if (showOnboarding) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-[#080808] text-cyan-400 font-mono p-4">
-        <div className="w-full max-w-md border border-cyan-400 rounded-lg p-8 shadow-md shadow-cyan-400">
-          <h1 className="text-2xl font-bold mb-6 text-center">
-            Welcome to TERMI
+      <div className="min-h-screen w-full flex items-center justify-center bg-indigo-600 p-4">
+        <div className="w-full max-w-md bg-[#000000] border-8 border-[#000000] shadow-[12px_12px_0px_0px_#000000] p-8 transform -rotate-1">
+          <h1 className="text-4xl font-black mb-6 text-center text-[#ffffff] transform rotate-1 font-mono">
+            VOICE CHAT
           </h1>
-          <form onSubmit={handleOnboardingSubmit} className="space-y-4">
+          <form onSubmit={handleOnboardingSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm mb-2">Enter your username:</label>
+              <label className="block text-xl font-black mb-3 text-[#ff6b35] font-mono">
+                USERNAME:
+              </label>
               <input
                 type="text"
                 value={username}
                 maxLength={16}
                 onChange={handleUsernameChange}
-                placeholder="Your username..."
-                className="w-full px-4 py-3 rounded border border-white bg-transparent text-white placeholder-white focus:outline-none font-mono"
+                placeholder="ENTER NAME..."
+                className="w-full px-4 py-4 bg-[#ffffff] border-4 border-[#000000] shadow-[6px_6px_0px_0px_#000000] text-[#000000] placeholder-[#666666] focus:outline-none font-mono font-black text-lg transform rotate-1"
                 autoFocus
               />
             </div>
             <button
               type="submit"
               disabled={!isUsernameValid()}
-              className="w-full px-4 py-3 rounded font-mono transition-all disabled:opacity-80 disabled:cursor-not-allowed bg-green-400 text-white"
+              className="w-full px-6 py-4 bg-[#00ff00] border-4 border-[#000000] shadow-[8px_8px_0px_0px_#000000] font-mono font-black text-xl text-[#000000] transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-[4px_4px_0px_0px_#000000] hover:translate-x-1 hover:translate-y-1 transform -rotate-1"
             >
-              START CHATTING
+              START TALKING!
             </button>
           </form>
         </div>
@@ -184,88 +368,95 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#080808] text-cyan-400 font-mono p-4">
-      <div className="w-full max-w-4xl h-[85vh] flex flex-col border border-cyan-400 rounded-lg overflow-hidden shadow-md shadow-cyan-400">
-        <div className="flex justify-between items-center p-4 border-b border-cyan-400 relative">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm px-2 py-1 rounded border border-green-400 shadow-md shadow-green-400">
-              <span className="text-green-400">TERMI:</span>
+    <div className="min-h-screen w-full flex items-center justify-center bg-indigo-700 p-4">
+      <audio ref={remoteAudioRef} autoPlay playsInline />
+      <div className="w-full max-w-2xl">
+        <div className="mb-8 text-center">
+          <div className="inline-block bg-[#000000] border-8 border-[#000000] shadow-[12px_12px_0px_0px_#000000] px-8 py-4 transform rotate-1">
+            <h1 className="text-3xl font-black text-[#ffffff] font-mono">
+              VOICE CHAT
+            </h1>
+            <div className="mt-2">
               {connected ? (
-                <span className="text-pink-400">
-                  CONNECTED {remoteUsername && `- ${remoteUsername}`}
+                <span className="text-2xl font-black text-[#00ff00] font-mono">
+                  TALKING TO: {remoteUsername || "STRANGER"}
                 </span>
               ) : (
-                <span className="animate-pulse text-white">CONNECTING...</span>
+                <span className="text-2xl font-black text-[#ffff00] font-mono animate-pulse">
+                  {isConnecting ? "CONNECTING..." : "FINDING STRANGER..."}
+                </span>
               )}
             </div>
           </div>
+        </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={disConnectRoomUser}
-              disabled={!connected}
-              className="shadow-md shadow-green-400 disabled:opacity-80 text-green-400 font-mono px-2 py-1 rounded border border-green-400 transition-all disabled:cursor-not-allowed duration-200"
+        <div className="flex justify-center gap-8 mb-12">
+          <div className="text-center">
+            <div
+              className={`w-32 h-32 rounded-full border-8 border-[#000000] shadow-[8px_8px_0px_0px_#000000] flex items-center justify-center transform -rotate-3 transition-all duration-200 ${
+                voiceActivity ? "bg-[#00ff00] scale-110" : "bg-[#ffffff]"
+              }`}
             >
-              <Rewind className="size-5 rotate-180" />
-            </button>
+              <div className="text-4xl font-black text-[#000000] font-mono">
+                YOU
+              </div>
+            </div>
+            <div className="mt-4 text-xl font-black text-[#000000] font-mono">
+              {username}
+            </div>
+          </div>
+
+          <div className="text-center">
+            <div
+              className={`w-32 h-32 rounded-full border-8 border-[#000000] shadow-[8px_8px_0px_0px_#000000] flex items-center justify-center transform rotate-3 transition-all duration-200 ${
+                remoteVoiceActivity ? "bg-[#ff0080] scale-110" : "bg-[#ffffff]"
+              }`}
+            >
+              <div className="text-4xl font-black text-[#000000] font-mono">
+                THEM
+              </div>
+            </div>
+            <div className="mt-4 text-xl font-black text-[#000000] font-mono">
+              {connected ? remoteUsername || "STRANGER" : "..."}
+            </div>
           </div>
         </div>
 
-        <div
-          style={{
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
-          }}
-          className="flex-1 overflow-y-auto p-6 space-y-4"
-        >
-          {messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`flex ${
-                msg.sender === "user" ? "justify-end" : "justify-start"
-              }`}
-            >
-              <div
-                className={`max-w-[70%] ${
-                  msg.sender === "user" ? "ml-auto" : "mr-auto"
-                }`}
-              >
-                <div className="px-3 py-1.5 rounded-lg border border-cyan-400 text-sm leading-relaxed break-words text-white shadow-md shadow-cyan-400">
-                  {msg.text}
-                </div>
-                <div
-                  className={`text-[10px] mt-2 text-white ${
-                    msg.sender === "user" ? "text-right" : "text-left"
-                  }`}
-                >
-                  {msg.timestamp} ·{" "}
-                  {msg.sender === "user" ? username : remoteUsername}
-                </div>
-              </div>
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
+        <div className="flex justify-center gap-6">
+          <button
+            onClick={toggleMute}
+            disabled={!connected}
+            className={`w-20 h-20 border-8 border-[#000000] shadow-[8px_8px_0px_0px_#000000] font-black text-[#000000] transition-all disabled:opacity-50 hover:shadow-[4px_4px_0px_0px_#000000] hover:translate-x-1 hover:translate-y-1 transform -rotate-2 ${
+              isMuted ? "bg-[#ff0000]" : "bg-[#ffffff]"
+            }`}
+          >
+            {isMuted ? <MicOff size={32} /> : <Mic size={32} />}
+          </button>
+
+          <button
+            onClick={disconnectCall}
+            disabled={!connected}
+            className="w-20 h-20 bg-[#ff0000] border-8 border-[#000000] shadow-[8px_8px_0px_0px_#000000] font-black text-[#ffffff] transition-all disabled:opacity-50 hover:shadow-[4px_4px_0px_0px_#000000] hover:translate-x-1 hover:translate-y-1 transform rotate-2"
+          >
+            <PhoneOff size={32} />
+          </button>
+
+          <button
+            onClick={toggleSpeaker}
+            disabled={!connected}
+            className={`w-20 h-20 border-8 border-[#000000] shadow-[8px_8px_0px_0px_#000000] font-black text-[#000000] transition-all disabled:opacity-50 hover:shadow-[4px_4px_0px_0px_#000000] hover:translate-x-1 hover:translate-y-1 transform rotate-2 ${
+              isSpeakerMuted ? "bg-[#ffff00]" : "bg-[#ffffff]"
+            }`}
+          >
+            {isSpeakerMuted ? <VolumeX size={32} /> : <Volume2 size={32} />}
+          </button>
         </div>
 
-        <div className="border-t border-cyan-400 p-4">
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <input
-                type="text"
-                value={message}
-                placeholder="TYPE MESSAGE..."
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={handleKeyPress}
-                className="shadow-md shadow-neutral-400 w-full placeholder-white text-white px-4 py-3 rounded border border-neutral-400 focus:outline-none font-mono text-sm"
-              />
-            </div>
-            <button
-              onClick={sendMessage}
-              disabled={!connected}
-              className="shadow-md shadow-neutral-400 text-white font-mono px-4 py-3 rounded border border-neutral-400 transition-all text-sm disabled:cursor-not-allowed duration-200"
-            >
-              SEND
-            </button>
+        <div className="mt-12 text-center">
+          <div className="inline-block bg-[#000000] border-4 border-[#000000] shadow-[6px_6px_0px_0px_#000000] px-6 py-3 transform -rotate-1">
+            <p className="text-lg font-black text-[#ffffff] font-mono">
+              SPEAK FREELY! DISCONNECT TO FIND SOMEONE NEW
+            </p>
           </div>
         </div>
       </div>

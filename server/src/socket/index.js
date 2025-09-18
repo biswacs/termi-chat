@@ -54,7 +54,7 @@ function socketConnection(io) {
       }
     });
 
-    socket.on("send_message", async (data) => {
+    socket.on("webrtc_offer", async (data) => {
       const userId = data.userId;
       const roomId = await redis.hget("USER_TO_ROOM", userId);
       if (!roomId) return;
@@ -63,9 +63,41 @@ function socketConnection(io) {
       if (!otherUserId) return;
       const otherUserSocket = await redis.hget("USERS", otherUserId);
       if (otherUserSocket) {
-        socket.to(otherUserSocket).emit("receive_message", {
-          message: data.message,
-          senderUsername: await redis.hget("USERNAMES", userId),
+        socket.to(otherUserSocket).emit("webrtc_offer", {
+          offer: data.offer,
+          fromUserId: userId,
+        });
+      }
+    });
+
+    socket.on("webrtc_answer", async (data) => {
+      const userId = data.userId;
+      const roomId = await redis.hget("USER_TO_ROOM", userId);
+      if (!roomId) return;
+      const roomUsers = await redis.smembers(`ROOM:${roomId}`);
+      let otherUserId = roomUsers.find((user) => user !== userId);
+      if (!otherUserId) return;
+      const otherUserSocket = await redis.hget("USERS", otherUserId);
+      if (otherUserSocket) {
+        socket.to(otherUserSocket).emit("webrtc_answer", {
+          answer: data.answer,
+          fromUserId: userId,
+        });
+      }
+    });
+
+    socket.on("webrtc_ice_candidate", async (data) => {
+      const userId = data.userId;
+      const roomId = await redis.hget("USER_TO_ROOM", userId);
+      if (!roomId) return;
+      const roomUsers = await redis.smembers(`ROOM:${roomId}`);
+      let otherUserId = roomUsers.find((user) => user !== userId);
+      if (!otherUserId) return;
+      const otherUserSocket = await redis.hget("USERS", otherUserId);
+      if (otherUserSocket) {
+        socket.to(otherUserSocket).emit("webrtc_ice_candidate", {
+          candidate: data.candidate,
+          fromUserId: userId,
         });
       }
     });

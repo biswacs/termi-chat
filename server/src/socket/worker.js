@@ -29,11 +29,13 @@ async function matchMaker(io) {
       const roomData1 = {
         roomId: roomId,
         remoteUsername: user2Username,
+        isCaller: true, // user1 will initiate the call
       };
 
       const roomData2 = {
         roomId: roomId,
         remoteUsername: user1Username,
+        isCaller: false, // user2 will wait for the call
       };
 
       io.to(user1SocketId).emit("registration_complete", roomData1);
