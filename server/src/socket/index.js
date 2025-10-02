@@ -23,6 +23,9 @@ async function disconnectUser(userId, socket, io, isManualDisconnect = false) {
     await redis.del(`ROOM:${roomId}`);
   }
 
+  await redis.hdel("USERS", userId);
+  await redis.hdel("USERNAMES", userId);
+
   if (isManualDisconnect) {
     await redis.lpush("WAITING_QUEUE", userId);
     await matchMaker(io);
@@ -83,7 +86,6 @@ function socketConnection(io) {
 
     socket.on("disconnect", async () => {
       const disconnectedUserId = await redis.hget("SOCKET_TO_USER", socket.id);
-      await redis.hget("USERNAMES", disconnectedUserId);
       if (disconnectedUserId) {
         await redis.hdel("SOCKET_TO_USER", socket.id);
         await disconnectUser(disconnectedUserId, socket, io, false);
